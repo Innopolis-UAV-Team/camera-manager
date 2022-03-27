@@ -22,6 +22,15 @@
 #include "CameraDevice.h"
 #include "CameraParameters.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 class CameraDeviceV4l2 final : public CameraDevice {
 public:
     CameraDeviceV4l2(std::string device);
@@ -60,4 +69,8 @@ private:
     CameraParameters::param_type getParamType(v4l2_ctrl_type type);
     int getV4l2ControlId(int paramId);
     int setV4l2Control(int ctrl_id, int value);
+    struct sockaddr_in     servaddr;
+
+    int sockfd;
+
 };

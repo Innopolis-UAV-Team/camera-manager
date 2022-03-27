@@ -22,6 +22,9 @@
 #include "CameraDeviceV4l2.h"
 #include "v4l2_interface.h"
 
+#include <sys/socket.h>
+#define PORT     8080
+
 CameraDeviceV4l2::CameraDeviceV4l2(std::string device)
     : mDeviceId(device)
     , mCardName("v4l2-card")
@@ -33,6 +36,18 @@ CameraDeviceV4l2::CameraDeviceV4l2(std::string device)
     int ret = initInfo();
     if (ret)
         log_error("Error in reading camera info");
+    
+    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+        log_error("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    log_info("udp extra port has been setup correctly");
+    memset(&servaddr, 0, sizeof(servaddr));
+
+    // Filling server information
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(PORT);
+    servaddr.sin_addr.s_addr = INADDR_ANY;
 }
 
 CameraDeviceV4l2::~CameraDeviceV4l2()
@@ -108,7 +123,17 @@ CameraDevice::Status CameraDeviceV4l2::setParam(CameraParameters &camParam, std:
     CameraParameters::cam_param_union_t u;
     memcpy(&u.param_float, param_value, sizeof(float));
     int paramId = camParam.getParameterID(param);
-    log_info("Parameter: %s Value: %d", param.c_str(), u.param_int32);
+    log_info("Parameter3: %s Value: %d", param.c_str(), u.param_int32);
+    // TODO: send this to anything udp msg
+    log_info("Send these data through udp: %s Value: %d", param.c_str(), u.param_int32);
+    // UDP Client
+    
+    // TODO: concat these in a better way
+    std::string msg = param + ":" + std::to_string(u.param_int32);
+    const char *send_msg = msg.c_str();
+    sendto(sockfd, (const char *)send_msg, strlen(send_msg),
+            MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+                sizeof(servaddr));
 
     cid = getV4l2ControlId(paramId);
     if (cid) {
