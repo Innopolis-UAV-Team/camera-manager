@@ -22,6 +22,9 @@
 
 #include "CameraDevice.h"
 #include "CameraParameters.h"
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 class CameraDeviceCustom final : public CameraDevice {
 public:
@@ -76,4 +79,7 @@ private:
     uint32_t mFrmRate;
     std::string mCamDefUri;
     std::string mOvText;
+    struct sockaddr_in servaddr;
+    int sockfd;
 };
+

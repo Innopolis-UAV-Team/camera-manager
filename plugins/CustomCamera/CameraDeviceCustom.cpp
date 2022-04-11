@@ -18,8 +18,11 @@
 
 #include <cstring>
 #include <iostream>
+#include <sys/ioctl.h>
 
 #include "CameraDeviceCustom.h"
+#include <sys/socket.h>
+#define PORT     8080
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 360
@@ -48,6 +51,17 @@ CameraDeviceCustom::CameraDeviceCustom(std::string device)
     , mOvText(device)
 {
     log_info("%s path:%s", __func__, mDeviceId.c_str());
+    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+        log_error("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+    log_info("udp extra port has been setup correctly");
+    memset(&servaddr, 0, sizeof(servaddr));
+
+    // Filling server information
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(PORT);
+    servaddr.sin_addr.s_addr = INADDR_ANY;
 }
 
 CameraDeviceCustom::~CameraDeviceCustom()
@@ -127,7 +141,7 @@ CameraDevice::Status CameraDeviceCustom::init(CameraParameters &camParam)
                                 CameraParameters::PARAM_TYPE_UINT32);
     camParam.setParameter(PARAMETER_CUSTOM_ENUM, (uint32_t)0);
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::uninit()
@@ -136,7 +150,7 @@ CameraDevice::Status CameraDeviceCustom::uninit()
      * Undo whatever was done in init() call.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::start()
@@ -145,7 +159,7 @@ CameraDevice::Status CameraDeviceCustom::start()
      * Start the camera device to capture images.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::stop()
@@ -154,7 +168,7 @@ CameraDevice::Status CameraDeviceCustom::stop()
      * Undo whatever was done in start() call.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::read(CameraData &data)
@@ -163,8 +177,9 @@ CameraDevice::Status CameraDeviceCustom::read(CameraData &data)
      * Fill the CameraData with frame and its meta-data.
      * This function need not be implemented for v4l2 devices
      */
+    // TODO
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::setParam(CameraParameters &camParam,
@@ -173,43 +188,57 @@ CameraDevice::Status CameraDeviceCustom::setParam(CameraParameters &camParam,
 {
     /*
      * 1. Set the parameter of the camera hardware.
-     * 2. Update the database CameraParameters
      */
 
     int ret = 0;
     CameraParameters::cam_param_union_t u;
     memcpy(&u.param_float, param_value, sizeof(float));
     int paramId = camParam.getParameterID(param);
-    switch (paramId) {
-    case ID_PARAMETER_CUSTOM_UINT8:
-        log_info("Parameter: %s Value: %d", param.c_str(), u.param_uint8);
-        camParam.setParameter(param, u.param_uint8);
-        break;
-    case ID_PARAMETER_CUSTOM_UINT32:
-        log_info("Parameter: %s Value: %d", param.c_str(), u.param_uint32);
-        camParam.setParameter(param, u.param_uint32);
-        break;
-    case ID_PARAMETER_CUSTOM_INT32:
-        log_info("Parameter: %s Value: %d", param.c_str(), u.param_int32);
-        camParam.setParameter(param, u.param_int32);
-        break;
-    case ID_PARAMETER_CUSTOM_REAL32:
-        log_info("Parameter: %s Value: %f", param.c_str(), u.param_float);
-        camParam.setParameter(param, u.param_float);
-        break;
-    case ID_PARAMETER_CUSTOM_ENUM:
-        log_info("Parameter: %s Value: %d", param.c_str(), u.param_uint32);
-        camParam.setParameter(param, u.param_uint32);
-        break;
-    default:
-        ret = -ENOTSUP;
-        break;
-    }
+    log_info("Parameter custom(int32): %s Value: %d", param.c_str(), u.param_int32);
+    // TODO: send this to anything udp msg
+    log_info("Send these data through udp: %s Value: %d", param.c_str(), u.param_int32);
+    // UDP Client
+    
+    // TODO: concat these in a better way
+    std::string msg = param + ":" + std::to_string(u.param_int32);
+    const char *send_msg = msg.c_str();
+    sendto(sockfd, (const char *)send_msg, strlen(send_msg),
+            MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+                sizeof(servaddr));
 
-    if (!ret)
-        return Status::SUCCESS;
-    else
-        return Status::NOT_SUPPORTED;
+    return CameraDevice::Status::SUCCESS;
+
+    // log_info("Custom Parameter: %s Value: %d", param.c_str(), u.param_int32);
+    // switch (paramId) {
+    // case ID_PARAMETER_CUSTOM_UINT8:
+    //     log_info("Parameter: %s Value: %d", param.c_str(), u.param_uint8);
+    //     camParam.setParameter(param, u.param_uint8);
+    //     break;
+    // case ID_PARAMETER_CUSTOM_UINT32:
+    //     log_info("Parameter: %s Value: %d", param.c_str(), u.param_uint32);
+    //     camParam.setParameter(param, u.param_uint32);
+    //     break;
+    // case ID_PARAMETER_CUSTOM_INT32:
+    //     log_info("Parameter: %s Value: %d", param.c_str(), u.param_int32);
+    //     camParam.setParameter(param, u.param_int32);
+    //     break;
+    // case ID_PARAMETER_CUSTOM_REAL32:
+    //     log_info("Parameter: %s Value: %f", param.c_str(), u.param_float);
+    //     camParam.setParameter(param, u.param_float);
+    //     break;
+    // case ID_PARAMETER_CUSTOM_ENUM:
+    //     log_info("Parameter: %s Value: %d", param.c_str(), u.param_uint32);
+    //     camParam.setParameter(param, u.param_uint32);
+    //     break;
+    // default:
+    //     ret = -ENOTSUP;
+    //     break;
+    // }
+
+    // if (!ret)
+    //     return CameraDevice::Status::SUCCESS;
+    // else
+    //     return CameraDevice::Status::NOT_SUPPORTED;
 }
 
 CameraDevice::Status CameraDeviceCustom::resetParams(CameraParameters &camParam)
@@ -220,7 +249,7 @@ CameraDevice::Status CameraDeviceCustom::resetParams(CameraParameters &camParam)
      * 3. Update the database CameraParameters
      */
 
-    CameraDevice::Status ret = Status::SUCCESS;
+    CameraDevice::Status ret = CameraDevice::Status::SUCCESS;
 
     // TODO :: The default params need to be stored in DS during init
     camParam.setParameter(CameraParameters::CAMERA_MODE,
@@ -242,7 +271,7 @@ CameraDevice::Status CameraDeviceCustom::setSize(const uint32_t width, const uin
      * 3. Unlikely, but some cameras may support setting of resolution on the fly
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getSize(uint32_t &width, uint32_t &height) const
@@ -254,7 +283,7 @@ CameraDevice::Status CameraDeviceCustom::getSize(uint32_t &width, uint32_t &heig
     width = mWidth;
     height = mHeight;
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getSupportedSizes(std::vector<Size> &sizes) const
@@ -265,7 +294,7 @@ CameraDevice::Status CameraDeviceCustom::getSupportedSizes(std::vector<Size> &si
      * 3. At times, the supported resolution is dependent on the pixel formats
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::setPixelFormat(const CameraParameters::PixelFormat format)
@@ -277,7 +306,7 @@ CameraDevice::Status CameraDeviceCustom::setPixelFormat(const CameraParameters::
      * 4. Pixel format conversion logic can be added to support more formats
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getPixelFormat(CameraParameters::PixelFormat &format) const
@@ -288,7 +317,7 @@ CameraDevice::Status CameraDeviceCustom::getPixelFormat(CameraParameters::PixelF
 
     format = mPixelFormat;
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getSupportedPixelFormats(
@@ -300,7 +329,7 @@ CameraDevice::Status CameraDeviceCustom::getSupportedPixelFormats(
      * 3. At times, the pixel format and resolution is interdependent
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::setMode(const CameraParameters::Mode mode)
@@ -311,7 +340,7 @@ CameraDevice::Status CameraDeviceCustom::setMode(const CameraParameters::Mode mo
      */
 
     mMode = mode;
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getMode(CameraParameters::Mode &mode) const
@@ -321,7 +350,7 @@ CameraDevice::Status CameraDeviceCustom::getMode(CameraParameters::Mode &mode) c
      */
 
     mode = mMode;
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status
@@ -331,7 +360,7 @@ CameraDeviceCustom::getSupportedModes(std::vector<CameraParameters::Mode> &modes
      * 1. Get the supported modes of the camera device.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::setFrameRate(const uint32_t fps)
@@ -340,7 +369,7 @@ CameraDevice::Status CameraDeviceCustom::setFrameRate(const uint32_t fps)
      * 1. Set the frame rate of the camera device.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getFrameRate(uint32_t &fps) const
@@ -349,7 +378,7 @@ CameraDevice::Status CameraDeviceCustom::getFrameRate(uint32_t &fps) const
      * 1. Get the frame rate of the camera device.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::getSupportedFrameRates(uint32_t &minFps, uint32_t &maxFps)
@@ -358,7 +387,7 @@ CameraDevice::Status CameraDeviceCustom::getSupportedFrameRates(uint32_t &minFps
      * 1. Get the supported frame rates of the camera device.
      */
 
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 CameraDevice::Status CameraDeviceCustom::setCameraDefinitionUri(const std::string uri)
@@ -371,10 +400,10 @@ CameraDevice::Status CameraDeviceCustom::setCameraDefinitionUri(const std::strin
      */
 
     if (uri.empty())
-        return Status::INVALID_ARGUMENT;
+        return CameraDevice::Status::INVALID_ARGUMENT;
 
     mCamDefUri = uri;
-    return Status::SUCCESS;
+    return CameraDevice::Status::SUCCESS;
 }
 
 std::string CameraDeviceCustom::getCameraDefinitionUri() const
@@ -382,7 +411,6 @@ std::string CameraDeviceCustom::getCameraDefinitionUri() const
     /*
      * 1. Return the Camera definition file URI.
      */
-
     return mCamDefUri;
 }
 

@@ -62,6 +62,10 @@ void PluginCustom::discoverCameras(std::vector<std::string> &camList)
      * 2. For V4L2, its scanning the video* nodes in /dev/ dir
      * 3. For Gazebo, the topics with "camera/image" is assumed to be a camera
      */
-
+    // To add another payload -> pushback another string with the payload id
+    // TODO: later make this read from a file with all the payloads that required
+    // For now it supports only one custom as the cache of the qground control saves the custom definition file in the same place with the same name of the 2nd custom definition file
+    camList.push_back("custom1");
+    // camList.push_back("custom2");
     return;
 }
