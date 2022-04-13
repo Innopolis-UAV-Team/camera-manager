@@ -200,7 +200,7 @@ CameraDevice::Status CameraDeviceCustom::setParam(CameraParameters &camParam,
     // UDP Client
     
     // TODO: concat these in a better way
-    std::string msg = param + ":" + std::to_string(u.param_int32);
+    std::string msg = param + ":" + std::to_string(u.param_int32) + ":" + CameraDeviceCustom::getDeviceId();
     const char *send_msg = msg.c_str();
     sendto(sockfd, (const char *)send_msg, strlen(send_msg),
             MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
